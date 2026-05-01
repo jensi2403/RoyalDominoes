@@ -218,13 +218,13 @@ body {
 }
 
 .board-chain .domino-tile {
-  width: 42px;
-  height: 80px;
+  width: 50px;
+  height: 96px;
 }
 
 .board-chain .pip {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 
 .board-chain .domino-divider {
