@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { Tile, PlayerId, BoardState, ValidPlay, GameState, PipValue, Lang, TileOrientation } from './game/types';
+import type { Tile, PlayerId, BoardState, ValidPlay, GameState, PipValue, Lang, TileOrientation, PlacedTile } from './game/types';
 import { getPlayerName, getTeam } from './game/types';
-import { createTileSet, shuffle, deal, findStartingPlayer, getValidPlays, playTileOnBoard, removeTileFromHand, nextPlayer, checkRoundEnd, handSum, canPlay, getPlayableTileEnds } from './game/engine';
+import { createTileSet, shuffle, deal, findStartingPlayer, getValidPlays, playTileOnBoard, removeTileFromHand, nextPlayer, checkRoundEnd, handSum, canPlay } from './game/engine';
 import { chooseAIPlay } from './game/ai';
 import { t } from './game/i18n';
 import { playPlaceSound, playPassSound, playWinSound, playLoseSound, playDealSound, playSelectSound, playTrancaSound, playClickSound } from './game/sounds';
@@ -41,6 +41,9 @@ function DominoTile({
   selected = false,
   notPlayable = false,
   onClick,
+  onTopHalfClick,
+  onBottomHalfClick,
+  highlightHalves = false,
   onDragStart,
   size = 'normal',
   orientation = 'up',
@@ -52,6 +55,9 @@ function DominoTile({
   selected?: boolean;
   notPlayable?: boolean;
   onClick?: () => void;
+  onTopHalfClick?: () => void;
+  onBottomHalfClick?: () => void;
+  highlightHalves?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   size?: 'normal' | 'small' | 'side';
   orientation?: TileOrientation;
@@ -65,7 +71,6 @@ function DominoTile({
     notPlayable ? 'not-playable' : '',
     size === 'small' ? 'board-tile' : '',
     size === 'side' ? 'side-tile' : '',
-    orientation === 'down' ? 'tile-down' : '',
     className,
   ].filter(Boolean).join(' ');
 
@@ -79,107 +84,142 @@ function DominoTile({
 
   return (
     <div className={classes} onClick={onClick} draggable={!!onDragStart} onDragStart={onDragStart}>
-      <PipGrid value={a} />
+      <div
+        className={`domino-half ${highlightHalves ? 'clickable-half' : ''}`}
+        onClick={highlightHalves ? (e) => { e.stopPropagation(); onTopHalfClick?.(); } : undefined}
+      >
+        <PipGrid value={a} />
+      </div>
       <div className="domino-divider" />
-      <PipGrid value={b} />
+      <div
+        className={`domino-half ${highlightHalves ? 'clickable-half' : ''}`}
+        onClick={highlightHalves ? (e) => { e.stopPropagation(); onBottomHalfClick?.(); } : undefined}
+      >
+        <PipGrid value={b} />
+      </div>
+    </div>
+  );
+}
+
+const CELL = 56;
+
+function BoardPipGrid({ value }: { value: number }) {
+  const positions = PIP_POSITIONS[value] || [];
+  return (
+    <>
+      {positions.map(([row, col], i) => (
+        <div
+          key={i}
+          className="pip"
+          style={{
+            gridRow: row,
+            gridColumn: col,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function BoardTile({ placed }: { placed: PlacedTile }) {
+  const isDouble = placed.isDouble;
+  // Doubles are vertical when placed on horizontal path (right/left), horizontal on vertical path (up/down)
+  const isVertical = isDouble && (placed.rotation === 0 || placed.rotation === 180);
+
+  // Normal tiles: swap values at 180° so pips stay fixed visually
+  const rot180 = placed.rotation === 180;
+  const a = rot180 ? placed.right : placed.left;
+  const b = rot180 ? placed.left : placed.right;
+
+  // Non-doubles use CSS rotation; doubles use shape changes (double-vertical)
+  const cssRotation = isDouble ? 0 : placed.rotation;
+
+  const rotClass =
+    cssRotation === 90 ? 'rot-down' :
+    cssRotation === -90 ? 'rot-up' :
+    cssRotation === 180 ? 'rot-left' : '';
+
+  const classes = [
+    'board-tile-abs',
+    isVertical ? 'double-vertical' : '',
+    rotClass,
+    'tile-enter',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div
+      className={classes}
+      style={{
+        left: placed.x * CELL,
+        top: placed.y * CELL,
+        transform: cssRotation !== 0 ? `rotate(${cssRotation}deg)` : undefined,
+      }}
+    >
+      <div className="domino-half">
+        <BoardPipGrid value={a} />
+      </div>
+      <div className="domino-divider" />
+      <div className="domino-half">
+        <BoardPipGrid value={b} />
+      </div>
     </div>
   );
 }
 
 function BoardChain({
   board,
-  playableEnds,
-  humanPlayer,
-  onEndClick,
-  onDropOnEnd,
 }: {
   board: BoardState;
-  playableEnds: ('left' | 'right')[];
-  humanPlayer: boolean;
-  onEndClick?: (end: 'left' | 'right') => void;
-  onDropOnEnd?: (tile: Tile, end: 'left' | 'right') => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    }
-  }, [board.tiles.length]);
-
   if (board.tiles.length === 0) {
     return (
       <div className="board-area">
-        <div className="board-chain" ref={scrollRef}>
-          {humanPlayer ? (
-            <div
-              className="end-marker end-marker-active"
-              onClick={() => onEndClick?.('right')}
-            >
-              ♦
-            </div>
-          ) : (
-            <div className="end-marker">♦</div>
-          )}
-        </div>
+        <div className="board-grid" />
       </div>
     );
   }
 
+  const minX = Math.min(...board.tiles.map(t => t.x));
+  const minY = Math.min(...board.tiles.map(t => t.y));
+  const maxX = Math.max(...board.tiles.map(t => t.x));
+  const maxY = Math.max(...board.tiles.map(t => t.y));
+
+  const offsetX = -minX * CELL;
+  const offsetY = -minY * CELL;
+
   return (
     <div className="board-area">
-      <div className="board-chain" ref={scrollRef}>
-        {playableEnds.includes('left') || humanPlayer ? (
-          <div
-            className={`end-marker ${humanPlayer && playableEnds.includes('left') ? 'end-marker-active' : ''}`}
-            onClick={humanPlayer && playableEnds.includes('left') ? () => onEndClick?.('left') : undefined}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              const tileStr = e.dataTransfer.getData('tile');
-              if (tileStr && onDropOnEnd) {
-                const [a, b] = tileStr.split(',').map(Number) as [PipValue, PipValue];
-                onDropOnEnd([a, b], 'left');
-              }
-            }}
-          >
-            ◄
-          </div>
-        ) : (
-          <div className="end-marker">◄</div>
-        )}
-        {board.tiles.map((placed, i) => (
-          <div key={i} className="tile-enter">
-            <DominoTile
-              tile={[placed.left, placed.right] as Tile}
-              size="small"
-              orientation={placed.orientation}
-            />
-          </div>
-        ))}
-        {playableEnds.includes('right') || humanPlayer ? (
-          <div
-            className={`end-marker ${humanPlayer && playableEnds.includes('right') ? 'end-marker-active' : ''}`}
-            onClick={humanPlayer && playableEnds.includes('right') ? () => onEndClick?.('right') : undefined}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              const tileStr = e.dataTransfer.getData('tile');
-              if (tileStr && onDropOnEnd) {
-                const [a, b] = tileStr.split(',').map(Number) as [PipValue, PipValue];
-                onDropOnEnd([a, b], 'right');
-              }
-            }}
-          >
-            ►
-          </div>
-        ) : (
-          <div className="end-marker">►</div>
-        )}
+      <div
+        className="board-grid"
+        style={{
+          width: (maxX - minX + 1) * CELL,
+          height: (maxY - minY + 1) * CELL,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: offsetX,
+            top: offsetY,
+            width: (maxX - minX + 1) * CELL,
+            height: (maxY - minY + 1) * CELL,
+          }}
+        >
+          {board.tiles.map((placed, i) => (
+            <BoardTile key={i} placed={placed} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
+
+const HAND_ROTATION: Record<'bottom' | 'top' | 'left' | 'right', 0 | 90 | 180 | 270> = {
+  bottom: 0,
+  top: 180,
+  left: 90,
+  right: 270,
+};
 
 function PlayerHand({
   hand,
@@ -188,6 +228,9 @@ function PlayerHand({
   validPlays,
   selectedTile,
   onSelectTile,
+  onTopHalfClick,
+  onBottomHalfClick,
+  choosingEnd,
   playedBy,
   label,
   debugMode,
@@ -202,6 +245,9 @@ function PlayerHand({
   validPlays: ValidPlay[];
   selectedTile: Tile | null;
   onSelectTile: (tile: Tile) => void;
+  onTopHalfClick?: (tile: Tile, half: 'top' | 'bottom') => void;
+  onBottomHalfClick?: (tile: Tile, half: 'top' | 'bottom') => void;
+  choosingEnd?: boolean;
   playedBy: PlayerId;
   label: string;
   debugMode: boolean;
@@ -237,35 +283,52 @@ function PlayerHand({
         {sortedHand.map((tile, i) => {
           const tileClass = getTileClass(tile);
           const isPlayable = isHuman && isCurrentPlayer && validPlays.some(vp => vp.tile[0] === tile[0] && vp.tile[1] === tile[1]);
+          const isSelected = selectedTile !== null && tile[0] === selectedTile[0] && tile[1] === selectedTile[1];
+          const showHalves = isSelected && choosingEnd && isHuman && isCurrentPlayer;
           return (
-            <DominoTile
+            <div
               key={`${tile[0]}-${tile[1]}-${i}`}
-              tile={tile}
-              faceDown={!showFace}
-              playable={isPlayable}
-              selected={selectedTile !== null && tile[0] === selectedTile[0] && tile[1] === selectedTile[1]}
-              notPlayable={isHuman && isCurrentPlayer && validPlays.length > 0 && !isPlayable}
-              onClick={isHuman && isPlayable ? () => onSelectTile(tile) : undefined}
-              onDragStart={isHuman && isPlayable ? (e: React.DragEvent) => {
-                e.dataTransfer.setData('tile', `${tile[0]},${tile[1]}`);
-                e.dataTransfer.effectAllowed = 'move';
-              } : undefined}
-              size={tileSize as 'normal' | 'small' | 'side'}
-              className={tileClass}
-            />
+              style={{
+                transform: `rotate(${HAND_ROTATION[position]}deg)`,
+                transformOrigin: 'center center',
+              }}
+            >
+              <DominoTile
+                tile={tile}
+                faceDown={!showFace}
+                playable={isPlayable}
+                selected={isSelected}
+                notPlayable={isHuman && isCurrentPlayer && validPlays.length > 0 && !isPlayable}
+                onClick={isHuman && isPlayable ? () => onSelectTile(tile) : undefined}
+                onTopHalfClick={showHalves ? () => onTopHalfClick?.(tile, 'top') : undefined}
+                onBottomHalfClick={showHalves ? () => onBottomHalfClick?.(tile, 'bottom') : undefined}
+                highlightHalves={showHalves}
+                onDragStart={isHuman && isPlayable ? (e: React.DragEvent) => {
+                  e.dataTransfer.setData('tile', `${tile[0]},${tile[1]}`);
+                  e.dataTransfer.effectAllowed = 'move';
+                } : undefined}
+                size={tileSize as 'normal' | 'small' | 'side'}
+                className={tileClass}
+              />
+            </div>
           );
         })}
       </div>
       {isHuman && isCurrentPlayer && onPass && (
-        <div style={{ marginTop: 4 }}>
+        <div style={{ marginTop: 4, textAlign: 'center' }}>
           {canPlayNow ? (
             <div style={{ fontSize: 10, opacity: 0.5 }}>
               {t('game.yourTurn', lang)}
             </div>
           ) : (
-            <button className="btn btn-pass" onClick={onPass}>
-              {t('game.pass', lang)}
-            </button>
+            <>
+              <div style={{ fontSize: 11, color: '#ff8888', fontWeight: 700, marginBottom: 4 }}>
+                {t('hand.noPlays', lang)}
+              </div>
+              <button className="btn btn-pass" onClick={onPass}>
+                {t('game.pass', lang)}
+              </button>
+            </>
           )}
         </div>
       )}
@@ -399,7 +462,7 @@ export default function App() {
   const [state, setState] = useState<GameState>({
     phase: 'setup',
     hands: [[], [], [], []],
-    board: { tiles: [], leftEnd: null, rightEnd: null },
+    board: { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() },
     currentPlayer: 0,
     consecutivePasses: 0,
     scores: [0, 0],
@@ -426,14 +489,14 @@ export default function App() {
     const hands = deal(tiles);
     const starting = findStartingPlayer(hands, 1, null);
     const isFirstPlay = true;
-    const validPlays = getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null }, isFirstPlay);
+    const validPlays = getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() }, isFirstPlay);
 
     playDealSound();
 
     setState({
       phase: 'playing',
       hands,
-      board: { tiles: [], leftEnd: null, rightEnd: null },
+      board: { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() },
       currentPlayer: starting,
       consecutivePasses: 0,
       scores: [0, 0],
@@ -458,7 +521,7 @@ export default function App() {
     const hands = deal(tiles);
     const starting = previousWinner;
     const isFirstPlay = true;
-    const valid = starting === 0 ? getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null }, isFirstPlay) : [];
+    const valid = starting === 0 ? getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() }, isFirstPlay) : [];
 
     playDealSound();
 
@@ -466,7 +529,7 @@ export default function App() {
       ...prev,
       phase: 'playing',
       hands,
-      board: { tiles: [], leftEnd: null, rightEnd: null },
+      board: { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() },
       currentPlayer: starting,
       consecutivePasses: 0,
       roundNumber: prev.roundNumber + 1,
@@ -488,12 +551,16 @@ export default function App() {
     setState(prev => {
       if (prev.phase !== 'playing' || prev.currentPlayer !== 0) return prev;
 
-      const isFirstPlay = prev.board.tiles.length === 0;
-      const computedValidPlays = getValidPlays(prev.hands[0], prev.board, isFirstPlay);
-      const validForTile = computedValidPlays.filter(vp => vp.tile[0] === tile[0] && vp.tile[1] === tile[1]);
+      const boardEmpty = prev.board.tiles.length === 0;
+      const validPlays = getValidPlays(prev.hands[0], prev.board, boardEmpty);
+
+      const validForTile = validPlays.filter(vp =>
+        (vp.tile[0] === tile[0] && vp.tile[1] === tile[1]) ||
+        (vp.tile[0] === tile[1] && vp.tile[1] === tile[0])
+      );
       if (validForTile.length === 0) return prev;
 
-      if (validForTile.length === 1 || prev.board.tiles.length === 0) {
+      if (validForTile.length === 1 || boardEmpty) {
         const end = validForTile[0].end;
         const newBoard = playTileOnBoard(prev.board, tile, end);
         const newHands = prev.hands.map((h, i) => i === 0 ? removeTileFromHand(h, tile) : h) as Tile[][];
@@ -565,13 +632,8 @@ export default function App() {
     });
   }, []);
 
-  const handleChooseEnd = useCallback((end: 'left' | 'right') => {
-    playClickSound();
-
+  const executePlay = useCallback((tile: Tile, end: 'left' | 'right') => {
     setState(prev => {
-      if (!prev.selectedTile) return prev;
-
-      const tile = prev.selectedTile;
       const newBoard = playTileOnBoard(prev.board, tile, end);
       const newHands = prev.hands.map((h, i) => i === 0 ? removeTileFromHand(h, tile) : h) as Tile[][];
       const newConsecutivePasses = 0;
@@ -624,58 +686,32 @@ export default function App() {
     });
   }, []);
 
-  const handleDropOnEnd = useCallback((tile: Tile, end: 'left' | 'right') => {
-    const isFirstPlay = state.board.tiles.length === 0;
-    const computedValidPlays = getValidPlays(state.hands[0], state.board, isFirstPlay);
-    const isValidPlay = computedValidPlays.some(vp =>
-      vp.tile[0] === tile[0] && vp.tile[1] === tile[1] && vp.end === end
-    );
+  const handleHalfClick = useCallback((tile: Tile, half: 'top' | 'bottom') => {
+    playClickSound();
+    const [a, b] = tile;
+    const value = half === 'top' ? a : b;
 
-    if (!isValidPlay) {
-      playClickSound();
-      return;
-    }
+    let end: 'left' | 'right' = 'right';
 
-    playPlaceSound();
-
-    const newBoard = playTileOnBoard(state.board, tile, end);
-    const newHands = state.hands.map((h, i) => i === 0 ? removeTileFromHand(h, tile) : h) as Tile[][];
-    const newConsecutivePasses = 0;
-
-    const tempState: GameState = {
-      ...state,
-      hands: newHands,
-      board: newBoard,
-      consecutivePasses: newConsecutivePasses,
-      selectedTile: null,
-      choosingEnd: false,
-      validPlays: [],
-      lastPlayedBy: 0,
-    };
-
-    const result = checkRoundEnd({ ...tempState, currentPlayer: 0 });
-    if (result) {
-      const newScores: [number, number] = [state.scores[0] + result.scores[0], state.scores[1] + result.scores[1]];
-      const gameWinner = newScores[0] >= state.targetScore ? 0 : newScores[1] >= state.targetScore ? 1 : null;
-
-      if (gameWinner !== null) {
-        if (gameWinner === 0) playWinSound(); else playLoseSound();
-        setState({ ...tempState, phase: 'gameEnd', scores: newScores, roundResult: result, gameWinner });
-        return;
-      } else if (result.isTranca) {
-        playTrancaSound();
-      } else if (result.winner === 0 || result.winner === 2) {
-        playWinSound();
+    if (state.board.leftEnd === value && state.board.rightEnd !== value) {
+      end = 'left';
+    } else if (state.board.rightEnd === value && state.board.leftEnd !== value) {
+      end = 'right';
+    } else if (state.board.leftEnd === value && state.board.rightEnd === value) {
+      const otherValue = half === 'top' ? b : a;
+      if (state.board.leftEnd === otherValue && state.board.rightEnd !== otherValue) {
+        end = 'right';
+      } else if (state.board.rightEnd === otherValue && state.board.leftEnd !== otherValue) {
+        end = 'left';
       } else {
-        playLoseSound();
+        end = 'right';
       }
-      setState({ ...tempState, phase: 'roundEnd', scores: newScores, roundResult: result });
-      return;
+    } else {
+      return; // invalid click
     }
 
-    const nextP = nextPlayer(0) as PlayerId;
-    setState({ ...tempState, currentPlayer: nextP, aiThinking: true });
-  }, [state]);
+    executePlay(tile, end);
+  }, [state.board.leftEnd, state.board.rightEnd, executePlay]);
 
   const handlePass = useCallback(() => {
     playPassSound();
@@ -849,10 +885,6 @@ export default function App() {
   }
 
 
-  const playableEnds: ('left' | 'right')[] = state.selectedTile && state.choosingEnd
-    ? getPlayableTileEnds(state.selectedTile, state.board)
-    : [];
-
   const playerLabels: Record<PlayerId, string> = {
     0: t('player.you', state.lang),
     1: t('player.right', state.lang),
@@ -933,13 +965,7 @@ export default function App() {
         </div>
 
         {/* Board */}
-        <BoardChain
-          board={state.board}
-          playableEnds={state.choosingEnd && state.selectedTile ? playableEnds : []}
-          humanPlayer={isHumanTurn}
-          onEndClick={isHumanTurn && state.selectedTile ? handleChooseEnd : undefined}
-          onDropOnEnd={isHumanTurn ? handleDropOnEnd : undefined}
-        />
+        <BoardChain board={state.board} />
 
         {/* Right side */}
         <div className="side-areas right" style={{ top: '50%', transform: 'translateY(-50%)' }}>
@@ -972,21 +998,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Choose end overlay */}
-      {state.choosingEnd && state.selectedTile && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '4px 0' }}>
-          <DominoTile tile={state.selectedTile} />
-          <button className="btn btn-primary" onClick={() => handleChooseEnd('left')}>
-            ◄ {t('game.playLeft', state.lang)}
-          </button>
-          <button className="btn btn-primary" onClick={() => handleChooseEnd('right')}>
-            {t('game.playRight', state.lang)} ►
-          </button>
-          <button className="btn btn-secondary" onClick={() => setState(prev => ({ ...prev, selectedTile: null, choosingEnd: false }))}>
-            {t('game.cancel', state.lang)}
-          </button>
-        </div>
-      )}
+
 
       {/* Bottom player (you) */}
       <div className="bottom-area">
@@ -997,6 +1009,9 @@ export default function App() {
           validPlays={humanValidPlays}
           selectedTile={state.selectedTile}
           onSelectTile={handleSelectTile}
+          onTopHalfClick={handleHalfClick}
+          onBottomHalfClick={handleHalfClick}
+          choosingEnd={state.choosingEnd}
           playedBy={0}
           label={playerLabels[0]}
           debugMode={state.debugMode}

@@ -6,7 +6,7 @@ const translations: Record<string, Record<Lang, string>> = {
   'setup.targetScore': { es: 'Puntuación Objetivo', en: 'Target Score' },
   'setup.start': { es: 'Comenzar Juego', en: 'Start Game' },
   'game.yourTurn': { es: 'Tu turno — selecciona una ficha', en: 'Your turn — select a tile' },
-  'game.chooseEnd': { es: '¿En qué extremo juegas?', en: 'Which end do you play?' },
+  'game.chooseEnd': { es: 'Selecciona el número que quieres jugar', en: 'Select the number you want to play' },
   'game.playLeft': { es: 'Izquierda', en: 'Left' },
   'game.playRight': { es: 'Derecha', en: 'Right' },
   'game.cancel': { es: 'Cancelar', en: 'Cancel' },
@@ -35,7 +35,7 @@ const translations: Record<string, Record<Lang, string>> = {
   'player.top': { es: 'Compañero', en: 'Partner' },
   'player.left': { es: 'Izquierdo', en: 'Left' },
   'lang.toggle': { es: 'EN', en: 'ES' },
-  'hand.noPlays': { es: 'No tienes jugadas', en: 'No valid plays' },
+  'hand.noPlays': { es: 'No tienes fichas, debes pasar', en: 'No valid plays' },
   'board.empty': { es: 'Primera jugada', en: 'First play' },
 };
 

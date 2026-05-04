@@ -3,6 +3,7 @@ export type Tile = [PipValue, PipValue];
 export type PlayerId = 0 | 1 | 2 | 3;
 export type PlayEnd = 'left' | 'right';
 export type TileOrientation = 'up' | 'down';
+export type BoardDir = 'right' | 'left' | 'up' | 'down';
 
 export interface PlacedTile {
   left: PipValue;
@@ -10,12 +11,18 @@ export interface PlacedTile {
   isDouble: boolean;
   playedBy: PlayerId;
   orientation: TileOrientation;
+  x: number;
+  y: number;
+  rotation: number;
 }
 
 export interface BoardState {
   tiles: PlacedTile[];
   leftEnd: PipValue | null;
   rightEnd: PipValue | null;
+  leftDir: BoardDir;
+  rightDir: BoardDir;
+  occupied: Set<string>;
 }
 
 export interface ValidPlay {

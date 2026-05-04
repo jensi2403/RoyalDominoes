@@ -112,14 +112,7 @@ body {
   height: 70px;
 }
 
-/* Tile orientation - rotated 180° (doubles placed with matching numbers together) */
-.domino-tile.tile-down {
-  transform: rotate(180deg);
-}
 
-.domino-tile.tile-down:hover {
-  transform: rotate(180deg) translateY(-4px) scale(1.08);
-}
 
 .domino-tile.playable {
   cursor: pointer;
@@ -172,17 +165,21 @@ body {
 }
 
 .pip {
-  width: 7px;
-  height: 7px;
-  background: radial-gradient(circle, var(--pip-color-highlight) 0%, var(--pip-color) 70%);
-  border-radius: 50%;
-  box-shadow: inset 0 -0.5px 0 rgba(255,255,255,0.3);
-}
-
-.domino-tile.playable .pip,
-.domino-tile.selected .pip {
   width: 8px;
   height: 8px;
+  background: radial-gradient(circle at 35% 35%, #444 0%, #111 50%, #000 100%);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.domino-half.clickable-half {
+  transition: background 0.15s ease;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.domino-half.clickable-half:hover {
+  background: rgba(212, 168, 67, 0.25);
 }
 
 /* --- Board --- */
@@ -217,24 +214,98 @@ body {
   border-radius: 2px;
 }
 
-.board-chain .domino-tile {
+/* --- Board Grid (absolute snake layout) --- */
+.board-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px;
+  position: relative;
+}
+
+.board-grid {
+  position: relative;
+  width: 784px;
+  height: 392px;
+}
+
+.board-tile-abs {
+  position: absolute;
   width: 50px;
-  height: 96px;
+  height: 28px;
+  background: var(--tile-face);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px var(--tile-shadow);
+  transition: none;
 }
 
-.board-chain .pip {
-  width: 8px;
-  height: 8px;
+.board-tile-abs .domino-half {
+  width: 50%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr);
+  place-items: center;
 }
 
-.board-chain .domino-divider {
-  background: #a89878;
+.board-tile-abs .domino-divider {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  transform: translateX(-50%);
+  background: #b8a88a;
+  z-index: 2;
 }
 
-.board-chain .domino-half {
-  gap: 0;
+.board-tile-abs .pip {
+  width: 7px;
+  height: 7px;
 }
 
+/* Doubles on board: shown vertical (rotated 90°) */
+.board-tile-abs.double-vertical {
+  width: 28px;
+  height: 50px;
+  flex-direction: column;
+}
+
+.board-tile-abs.double-vertical .domino-half {
+  width: 100%;
+  height: 50%;
+}
+
+.board-tile-abs.double-vertical .domino-divider {
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  bottom: auto;
+  width: auto;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+/* Rotated tiles in snake path */
+.board-tile-abs.rot-left {
+  transform: rotate(180deg);
+}
+
+.board-tile-abs.rot-up {
+  transform: rotate(-90deg);
+}
+
+.board-tile-abs.rot-down {
+  transform: rotate(90deg);
+}
+
+/* End marker */
 .end-marker {
   width: 20px;
   height: 20px;

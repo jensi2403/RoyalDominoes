@@ -1,4 +1,4 @@
-import type { Tile, PipValue, PlayerId, BoardState, ValidPlay, RoundResult, GameState, TileOrientation } from './types';
+import type { Tile, PipValue, PlayerId, BoardState, ValidPlay, RoundResult, GameState, TileOrientation, BoardDir } from './types';
 
 export function createTileSet(): Tile[] {
   const tiles: Tile[] = [];
@@ -101,20 +101,115 @@ export function getTileOrientation(tile: Tile, end: 'left' | 'right', board: Boa
   }
 }
 
+/* ── Snake board layout ────────────────────────────────────────────── */
+
+const GRID_W = 18;
+const GRID_H = 12;
+
+const VECTORS: Record<BoardDir, [number, number]> = {
+  right: [1, 0],
+  left: [-1, 0],
+  up: [0, -1],
+  down: [0, 1],
+};
+
+const TURN_CW: Record<BoardDir, BoardDir> = {
+  right: 'down',
+  down: 'left',
+  left: 'up',
+  up: 'right',
+};
+
+const TURN_CCW: Record<BoardDir, BoardDir> = {
+  right: 'up',
+  up: 'left',
+  left: 'down',
+  down: 'right',
+};
+
+function isFree(occupied: Set<string>, x: number, y: number): boolean {
+  if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) return false;
+  return !occupied.has(`${x},${y}`);
+}
+
+const OPPOSITE: Record<BoardDir, BoardDir> = {
+  right: 'left',
+  left: 'right',
+  up: 'down',
+  down: 'up',
+};
+
+function findNextDir(
+  occupied: Set<string>,
+  fromX: number,
+  fromY: number,
+  currentDir: BoardDir,
+): BoardDir {
+  const [dx, dy] = VECTORS[currentDir];
+  if (isFree(occupied, fromX + dx, fromY + dy)) return currentDir;
+
+  const ccw = TURN_CCW[currentDir];
+  const [ccwDx, ccwDy] = VECTORS[ccw];
+  if (isFree(occupied, fromX + ccwDx, fromY + ccwDy)) return ccw;
+
+  const cw = TURN_CW[currentDir];
+  const [cwDx, cwDy] = VECTORS[cw];
+  if (isFree(occupied, fromX + cwDx, fromY + cwDy)) return cw;
+
+  const rev = OPPOSITE[currentDir];
+  const [rDx, rDy] = VECTORS[rev];
+  if (isFree(occupied, fromX + rDx, fromY + rDy)) return rev;
+
+  return currentDir;
+}
+
+function getRotation(dir: BoardDir, isDouble: boolean): number {
+  if (isDouble) {
+    return dir === 'right' || dir === 'left' ? 90 : 0;
+  }
+  switch (dir) {
+    case 'right': return 0;
+    case 'left': return 180;
+    case 'up': return -90;
+    case 'down': return 90;
+  }
+}
+
 export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'right'): BoardState {
   const [a, b] = tile;
   const isDouble = a === b;
   const orientation = getTileOrientation(tile, end, board);
 
   if (board.tiles.length === 0) {
-    return {
-      tiles: [{ left: a, right: b, isDouble, playedBy: 0, orientation }],
+    const cx = Math.floor(GRID_W / 2);
+    const cy = Math.floor(GRID_H / 2);
+    const result = {
+      tiles: [{
+        left: a, right: b, isDouble, playedBy: 0 as PlayerId, orientation,
+        x: cx, y: cy, rotation: 0,
+      }],
       leftEnd: a,
       rightEnd: b,
+      leftDir: 'left' as BoardDir,
+      rightDir: 'right' as BoardDir,
+      occupied: new Set([`${cx},${cy}`]),
     };
+    return result;
   }
 
   const newTiles = [...board.tiles];
+  const occupied = new Set(board.occupied);
+
+  let refTile = end === 'left' ? board.tiles[0] : board.tiles[board.tiles.length - 1];
+  let currentDir = end === 'left' ? board.leftDir : board.rightDir;
+
+  const nextDir = findNextDir(occupied, refTile.x, refTile.y, currentDir);
+  const [dx, dy] = VECTORS[nextDir];
+  const newX = refTile.x + dx;
+  const newY = refTile.y + dy;
+
+  occupied.add(`${newX},${newY}`);
+  const rotation = getRotation(nextDir, isDouble);
 
   if (end === 'left') {
     const matchValue = board.leftEnd!;
@@ -126,12 +221,20 @@ export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'ri
       right = b;
       left = a;
     }
-    newTiles.unshift({ left: left as PipValue, right: right as PipValue, isDouble, playedBy: 0, orientation });
-    return {
+    newTiles.unshift({
+      left: left as PipValue, right: right as PipValue,
+      isDouble, playedBy: 0 as PlayerId, orientation,
+      x: newX, y: newY, rotation,
+    });
+    const result = {
       tiles: newTiles,
       leftEnd: left as PipValue,
       rightEnd: board.rightEnd,
+      leftDir: nextDir,
+      rightDir: board.rightDir,
+      occupied,
     };
+    return result;
   } else {
     const matchValue = board.rightEnd!;
     let left: PipValue, right: PipValue;
@@ -142,12 +245,20 @@ export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'ri
       left = b;
       right = a;
     }
-    newTiles.push({ left: left as PipValue, right: right as PipValue, isDouble, playedBy: 0, orientation });
-    return {
+    newTiles.push({
+      left: left as PipValue, right: right as PipValue,
+      isDouble, playedBy: 0 as PlayerId, orientation,
+      x: newX, y: newY, rotation,
+    });
+    const result = {
       tiles: newTiles,
       leftEnd: board.leftEnd,
       rightEnd: right as PipValue,
+      leftDir: board.leftDir,
+      rightDir: nextDir,
+      occupied,
     };
+    return result;
   }
 }
 
@@ -226,4 +337,9 @@ export function getPlayableTileEnds(tile: Tile, board: BoardState): ('left' | 'r
   if (a === board.leftEnd || b === board.leftEnd) ends.push('left');
   if (a === board.rightEnd || b === board.rightEnd) ends.push('right');
   return ends;
+}
+
+export function _logBoard(board: BoardState, prefix = '') {
+  console.log(`${prefix}Board(${board.tiles.length} tiles): leftEnd=${board.leftEnd}, rightEnd=${board.rightEnd}, leftDir=${board.leftDir}, rightDir=${board.rightDir}`);
+  console.log(`${prefix}  Tiles: ${board.tiles.map(t => `[${t.left}|${t.right}]`).join(', ')}`);
 }
