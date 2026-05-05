@@ -103,8 +103,9 @@ export function getTileOrientation(tile: Tile, end: 'left' | 'right', board: Boa
 
 /* ── Snake board layout ────────────────────────────────────────────── */
 
-const GRID_W = 18;
+const GRID_W = 20;
 const GRID_H = 12;
+const MARGIN = 2;
 
 const VECTORS: Record<BoardDir, [number, number]> = {
   right: [1, 0],
@@ -129,15 +130,9 @@ const TURN_CCW: Record<BoardDir, BoardDir> = {
 
 function isFree(occupied: Set<string>, x: number, y: number): boolean {
   if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) return false;
+  if (y < MARGIN || y >= GRID_H - MARGIN) return false;
   return !occupied.has(`${x},${y}`);
 }
-
-const OPPOSITE: Record<BoardDir, BoardDir> = {
-  right: 'left',
-  left: 'right',
-  up: 'down',
-  down: 'up',
-};
 
 function findNextDir(
   occupied: Set<string>,
@@ -156,14 +151,10 @@ function findNextDir(
   const [cwDx, cwDy] = VECTORS[cw];
   if (isFree(occupied, fromX + cwDx, fromY + cwDy)) return cw;
 
-  const rev = OPPOSITE[currentDir];
-  const [rDx, rDy] = VECTORS[rev];
-  if (isFree(occupied, fromX + rDx, fromY + rDy)) return rev;
-
   return currentDir;
 }
 
-function getRotation(dir: BoardDir, isDouble: boolean): number {
+function getGridRotation(dir: BoardDir, isDouble: boolean): number {
   if (isDouble) {
     return dir === 'right' || dir === 'left' ? 90 : 0;
   }
@@ -175,6 +166,10 @@ function getRotation(dir: BoardDir, isDouble: boolean): number {
   }
 }
 
+function getDoubleRotationDeg(incomingDir: BoardDir): number {
+  return 0;
+}
+
 export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'right'): BoardState {
   const [a, b] = tile;
   const isDouble = a === b;
@@ -183,10 +178,11 @@ export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'ri
   if (board.tiles.length === 0) {
     const cx = Math.floor(GRID_W / 2);
     const cy = Math.floor(GRID_H / 2);
+    const rotationDeg = getDoubleRotationDeg('right');
     const result = {
       tiles: [{
         left: a, right: b, isDouble, playedBy: 0 as PlayerId, orientation,
-        x: cx, y: cy, rotation: 0,
+        x: cx, y: cy, rotation: 0, rotationDeg: isDouble ? rotationDeg : 0,
       }],
       leftEnd: a,
       rightEnd: b,
@@ -209,7 +205,8 @@ export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'ri
   const newY = refTile.y + dy;
 
   occupied.add(`${newX},${newY}`);
-  const rotation = getRotation(nextDir, isDouble);
+  const rotation = getGridRotation(nextDir, isDouble);
+  const rotationDeg = isDouble ? getDoubleRotationDeg(nextDir) : 0;
 
   if (end === 'left') {
     const matchValue = board.leftEnd!;
@@ -224,7 +221,7 @@ export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'ri
     newTiles.unshift({
       left: left as PipValue, right: right as PipValue,
       isDouble, playedBy: 0 as PlayerId, orientation,
-      x: newX, y: newY, rotation,
+      x: newX, y: newY, rotation, rotationDeg,
     });
     const result = {
       tiles: newTiles,
@@ -248,7 +245,7 @@ export function playTileOnBoard(board: BoardState, tile: Tile, end: 'left' | 'ri
     newTiles.push({
       left: left as PipValue, right: right as PipValue,
       isDouble, playedBy: 0 as PlayerId, orientation,
-      x: newX, y: newY, rotation,
+      x: newX, y: newY, rotation, rotationDeg,
     });
     const result = {
       tiles: newTiles,
@@ -337,9 +334,4 @@ export function getPlayableTileEnds(tile: Tile, board: BoardState): ('left' | 'r
   if (a === board.leftEnd || b === board.leftEnd) ends.push('left');
   if (a === board.rightEnd || b === board.rightEnd) ends.push('right');
   return ends;
-}
-
-export function _logBoard(board: BoardState, prefix = '') {
-  console.log(`${prefix}Board(${board.tiles.length} tiles): leftEnd=${board.leftEnd}, rightEnd=${board.rightEnd}, leftDir=${board.leftDir}, rightDir=${board.rightDir}`);
-  console.log(`${prefix}  Tiles: ${board.tiles.map(t => `[${t.left}|${t.right}]`).join(', ')}`);
 }

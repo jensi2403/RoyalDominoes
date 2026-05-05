@@ -123,15 +123,12 @@ function BoardPipGrid({ value }: { value: number }) {
 
 function BoardTile({ placed }: { placed: PlacedTile }) {
   const isDouble = placed.isDouble;
-  // Doubles are vertical when placed on horizontal path (right/left), horizontal on vertical path (up/down)
   const isVertical = isDouble && (placed.rotation === 0 || placed.rotation === 180);
 
-  // Normal tiles: swap values at 180° so pips stay fixed visually
   const rot180 = placed.rotation === 180;
   const a = rot180 ? placed.right : placed.left;
   const b = rot180 ? placed.left : placed.right;
 
-  // Non-doubles use CSS rotation; doubles use shape changes (double-vertical)
   const cssRotation = isDouble ? 0 : placed.rotation;
 
   const rotClass =

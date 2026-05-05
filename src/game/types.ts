@@ -14,6 +14,7 @@ export interface PlacedTile {
   x: number;
   y: number;
   rotation: number;
+  rotationDeg: number;
 }
 
 export interface BoardState {
