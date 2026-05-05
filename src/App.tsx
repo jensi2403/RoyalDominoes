@@ -128,17 +128,12 @@ function BoardTile({ placed }: { placed: PlacedTile }) {
   const a = rot180 ? placed.right : placed.left;
   const b = rot180 ? placed.left : placed.right;
 
-  const TILE_W = isDouble ? 28 : 50;
-  const TILE_H = isDouble ? 50 : 28;
-  const offsetX = (CELL - TILE_W) / 2;
-  const offsetY = (CELL - TILE_H) / 2;
+  const transform = !isDouble && placed.rotation !== 0
+    ? `rotate(${placed.rotation}deg)`
+    : undefined;
 
-  let transform: string | undefined;
-  if (isDouble) {
-    transform = 'rotate(45deg)';
-  } else if (placed.rotation !== 0) {
-    transform = `rotate(${placed.rotation}deg)`;
-  }
+  const offsetX = isDouble ? (CELL - 28) / 2 : 0;
+  const offsetY = isDouble ? 0 : (CELL - 28) / 2;
 
   const classes = [
     'board-tile-abs',

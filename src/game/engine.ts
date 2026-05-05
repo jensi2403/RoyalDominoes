@@ -105,7 +105,7 @@ export function getTileOrientation(tile: Tile, end: 'left' | 'right', board: Boa
 
 const GRID_W = 20;
 const GRID_H = 12;
-const MARGIN = 4;
+const MARGIN = 2;
 
 const VECTORS: Record<BoardDir, [number, number]> = {
   right: [1, 0],
