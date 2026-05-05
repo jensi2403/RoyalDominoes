@@ -101,7 +101,8 @@ function DominoTile({
   );
 }
 
-const CELL = 50;
+const TILE_LONG = 50;  // long dimension (tile length along chain, or double perpendicular)
+const TILE_SHORT = 28; // short dimension (tile width, or double along chain)
 
 function BoardPipGrid({ value }: { value: number }) {
   const positions = PIP_POSITIONS[value] || [];
@@ -121,87 +122,106 @@ function BoardPipGrid({ value }: { value: number }) {
   );
 }
 
-function BoardTile({ placed }: { placed: PlacedTile }) {
-  const isDouble = placed.isDouble;
+// Returns whether tile i is in a horizontal chain segment, based on neighbor positions
+function tileIsHoriz(tiles: PlacedTile[], i: number): boolean {
+  if (i < tiles.length - 1) return tiles[i + 1].x !== tiles[i].x;
+  if (i > 0) return tiles[i].x !== tiles[i - 1].x;
+  return true; // single tile defaults to horizontal
+}
 
+// Compute pixel positions by walking the chain edge-to-edge
+function computePixelPositions(tiles: PlacedTile[]): { px: number; py: number }[] {
+  if (tiles.length === 0) return [];
+  const result: { px: number; py: number }[] = [{ px: 0, py: 0 }];
+  for (let i = 0; i < tiles.length - 1; i++) {
+    const prev = result[i];
+    const cur = tiles[i];
+    const gdx = tiles[i + 1].x - cur.x;
+    const gdy = tiles[i + 1].y - cur.y;
+    // Step = cur tile's size in the movement direction
+    // Normal tile: LONG along chain, SHORT across; Double: SHORT along chain, LONG across
+    const step = gdx !== 0
+      ? (cur.isDouble ? TILE_SHORT : TILE_LONG)
+      : (cur.isDouble ? TILE_LONG : TILE_SHORT);
+    result.push({ px: prev.px + gdx * step, py: prev.py + gdy * step });
+  }
+  return result;
+}
+
+function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; py: number; horiz: boolean }) {
   const rot180 = placed.rotation === 180;
   const a = rot180 ? placed.right : placed.left;
   const b = rot180 ? placed.left : placed.right;
 
-  const transform = !isDouble && placed.rotation !== 0
-    ? `rotate(${placed.rotation}deg)`
-    : undefined;
-
-  const offsetX = isDouble ? (CELL - 28) / 2 : 0;
-  const offsetY = isDouble ? 0 : (CELL - 28) / 2;
-
-  const classes = [
-    'board-tile-abs',
-    isDouble ? 'double-vertical' : '',
-    'tile-enter',
-  ].filter(Boolean).join(' ');
-
-  return (
-    <div
-      className={classes}
-      style={{
-        left: placed.x * CELL + offsetX,
-        top: placed.y * CELL + offsetY,
-        transform,
-      }}
-    >
-      <div className="domino-half">
-        <BoardPipGrid value={a} />
-      </div>
-      <div className="domino-divider" />
-      <div className="domino-half">
-        <BoardPipGrid value={b} />
-      </div>
-    </div>
-  );
-}
-
-function BoardChain({
-  board,
-}: {
-  board: BoardState;
-}) {
-  if (board.tiles.length === 0) {
+  if (placed.isDouble) {
+    // Double: perpendicular to chain direction
+    // Horizontal chain → 28W × 50H (column layout)
+    // Vertical chain   → 50W × 28H (row layout)
+    const w = horiz ? TILE_SHORT : TILE_LONG;
+    const h = horiz ? TILE_LONG : TILE_SHORT;
     return (
-      <div className="board-area">
-        <div className="board-grid" />
+      <div
+        className="board-tile-abs tile-enter"
+        style={{
+          left: px, top: py, width: w, height: h,
+          flexDirection: horiz ? 'column' : 'row',
+        }}
+      >
+        <div className="domino-half"><BoardPipGrid value={a} /></div>
+        <div className="domino-divider" style={horiz
+          ? { position: 'absolute', left: 2, right: 2, top: '50%', width: 'auto', height: 1, transform: 'translateY(-50%)' }
+          : { position: 'absolute', top: 2, bottom: 2, left: '50%', width: 1, height: 'auto', transform: 'translateX(-50%)' }
+        } />
+        <div className="domino-half"><BoardPipGrid value={b} /></div>
       </div>
     );
   }
 
-  const minX = Math.min(...board.tiles.map(t => t.x));
-  const minY = Math.min(...board.tiles.map(t => t.y));
-  const maxX = Math.max(...board.tiles.map(t => t.x));
-  const maxY = Math.max(...board.tiles.map(t => t.y));
+  // Normal tile: 50×28, CSS rotation handles visual orientation
+  // Center the 28px short side in the 50px lane (offsetY for horiz, handled by rotation for vert)
+  const transform = placed.rotation !== 0 ? `rotate(${placed.rotation}deg)` : undefined;
+  return (
+    <div
+      className="board-tile-abs tile-enter"
+      style={{ left: px, top: py + 11, transform }}
+    >
+      <div className="domino-half"><BoardPipGrid value={a} /></div>
+      <div className="domino-divider" />
+      <div className="domino-half"><BoardPipGrid value={b} /></div>
+    </div>
+  );
+}
 
-  const offsetX = -minX * CELL;
-  const offsetY = -minY * CELL;
+function BoardChain({ board }: { board: BoardState }) {
+  if (board.tiles.length === 0) {
+    return <div className="board-area"><div className="board-grid" /></div>;
+  }
+
+  const pixelPos = computePixelPositions(board.tiles);
+
+  // Compute bounding box using actual pixel positions + tile sizes
+  let minPx = Infinity, minPy = Infinity, maxPx = -Infinity, maxPy = -Infinity;
+  board.tiles.forEach((tile, i) => {
+    const { px, py } = pixelPos[i];
+    const horiz = tileIsHoriz(board.tiles, i);
+    const w = tile.isDouble ? (horiz ? TILE_SHORT : TILE_LONG) : TILE_LONG;
+    const h = tile.isDouble ? (horiz ? TILE_LONG : TILE_SHORT) : TILE_SHORT;
+    const top = tile.isDouble ? py : py + 11;
+    minPx = Math.min(minPx, px);
+    minPy = Math.min(minPy, top);
+    maxPx = Math.max(maxPx, px + w);
+    maxPy = Math.max(maxPy, top + h);
+  });
+
+  const gridW = maxPx - minPx;
+  const gridH = maxPy - minPy;
 
   return (
     <div className="board-area">
-      <div
-        className="board-grid"
-        style={{
-          width: (maxX - minX + 1) * CELL,
-          height: (maxY - minY + 1) * CELL,
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            left: offsetX,
-            top: offsetY,
-            width: (maxX - minX + 1) * CELL,
-            height: (maxY - minY + 1) * CELL,
-          }}
-        >
+      <div className="board-grid" style={{ width: gridW, height: gridH, position: 'relative' }}>
+        <div style={{ position: 'absolute', left: -minPx, top: -minPy }}>
           {board.tiles.map((placed, i) => (
-            <BoardTile key={i} placed={placed} />
+            <BoardTile key={i} placed={placed} px={pixelPos[i].px} py={pixelPos[i].py} horiz={tileIsHoriz(board.tiles, i)} />
           ))}
         </div>
       </div>
