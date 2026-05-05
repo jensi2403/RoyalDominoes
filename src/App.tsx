@@ -101,7 +101,7 @@ function DominoTile({
   );
 }
 
-const CELL = 56;
+const CELL = 50;
 
 function BoardPipGrid({ value }: { value: number }) {
   const positions = PIP_POSITIONS[value] || [];
@@ -123,23 +123,26 @@ function BoardPipGrid({ value }: { value: number }) {
 
 function BoardTile({ placed }: { placed: PlacedTile }) {
   const isDouble = placed.isDouble;
-  const isVertical = isDouble && (placed.rotation === 0 || placed.rotation === 180);
 
   const rot180 = placed.rotation === 180;
   const a = rot180 ? placed.right : placed.left;
   const b = rot180 ? placed.left : placed.right;
 
-  const cssRotation = isDouble ? 0 : placed.rotation;
+  const TILE_W = isDouble ? 28 : 50;
+  const TILE_H = isDouble ? 50 : 28;
+  const offsetX = (CELL - TILE_W) / 2;
+  const offsetY = (CELL - TILE_H) / 2;
 
-  const rotClass =
-    cssRotation === 90 ? 'rot-down' :
-    cssRotation === -90 ? 'rot-up' :
-    cssRotation === 180 ? 'rot-left' : '';
+  let transform: string | undefined;
+  if (isDouble) {
+    transform = 'rotate(45deg)';
+  } else if (placed.rotation !== 0) {
+    transform = `rotate(${placed.rotation}deg)`;
+  }
 
   const classes = [
     'board-tile-abs',
-    isVertical ? 'double-vertical' : '',
-    rotClass,
+    isDouble ? 'double-vertical' : '',
     'tile-enter',
   ].filter(Boolean).join(' ');
 
@@ -147,9 +150,9 @@ function BoardTile({ placed }: { placed: PlacedTile }) {
     <div
       className={classes}
       style={{
-        left: placed.x * CELL,
-        top: placed.y * CELL,
-        transform: cssRotation !== 0 ? `rotate(${cssRotation}deg)` : undefined,
+        left: placed.x * CELL + offsetX,
+        top: placed.y * CELL + offsetY,
+        transform,
       }}
     >
       <div className="domino-half">
