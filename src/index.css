@@ -250,8 +250,6 @@ body {
 
 .board-tile-abs {
   position: absolute;
-  width: 50px;
-  height: 28px;
   background: var(--tile-face);
   border-radius: 4px;
   display: flex;
@@ -283,8 +281,10 @@ body {
 }
 
 .board-tile-abs .pip {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pip-color);
 }
 
 .board-tile-abs .domino-half {

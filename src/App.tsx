@@ -101,8 +101,8 @@ function DominoTile({
   );
 }
 
-const TILE_LONG = 50;
-const TILE_SHORT = 28;
+const TILE_LONG = 72;
+const TILE_SHORT = 40;
 const GRID_W = 20;
 const GRID_H = 12;
 const CANVAS_W = GRID_W * TILE_LONG;      // 1000
