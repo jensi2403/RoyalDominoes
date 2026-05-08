@@ -513,7 +513,7 @@ export default function App() {
     const tiles = shuffle(createTileSet());
     const hands = deal(tiles);
     const starting = findStartingPlayer(hands, 1, null);
-    const isFirstPlay = true;
+    const isFirstPlay = prev.roundNumber === 1;
     const validPlays = getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() }, isFirstPlay);
 
     playDealSound();
@@ -545,7 +545,7 @@ export default function App() {
     const tiles = shuffle(createTileSet());
     const hands = deal(tiles);
     const starting = previousWinner;
-    const isFirstPlay = true;
+    const isFirstPlay = false;
     const valid = starting === 0 ? getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() }, isFirstPlay) : [];
 
     playDealSound();
@@ -639,7 +639,7 @@ export default function App() {
         }
 
         const nextP = nextPlayer(0) as PlayerId;
-        const isFirstPlay = newBoard.tiles.length <= 1;
+    const isFirstPlay = true;
         const nextValidPlays = canPlay(newHands[nextP], newBoard, isFirstPlay) ? getValidPlays(newHands[nextP], newBoard, isFirstPlay) : [];
         const nextAiThinking = nextP !== 0;
 
@@ -697,8 +697,8 @@ export default function App() {
       }
 
       const nextP = nextPlayer(0) as PlayerId;
-      const isFirstPlay = newBoard.tiles.length <= 1;
-      const nextValidPlays = canPlay(newHands[nextP], newBoard, isFirstPlay) ? getValidPlays(newHands[nextP], newBoard, isFirstPlay) : [];
+      const isFirstPlay = prev.roundNumber === 1;
+      const nextValidPlays = canPlay(prev.hands[nextP], prev.board, isFirstPlay) ? getValidPlays(prev.hands[nextP], prev.board, isFirstPlay) : [];
 
       playPlaceSound();
 
@@ -746,7 +746,7 @@ export default function App() {
 
       const newConsecutivePasses = prev.consecutivePasses + 1;
       const nextP = nextPlayer(0) as PlayerId;
-      const isFirstPlay = prev.board.tiles.length <= 1;
+      const isFirstPlay = prev.roundNumber === 1;
 
       const tempState: GameState = {
         ...prev,
@@ -785,7 +785,7 @@ export default function App() {
     if (state.phase !== 'playing' || state.currentPlayer === 0) return;
 
     const playerId = state.currentPlayer;
-    const isFirstPlay = state.board.tiles.length === 0;
+    const isFirstPlay = state.roundNumber === 1;
     const delay = state.board.tiles.length === 0 ? 1200 : 700 + Math.random() * 500;
 
     aiTimeoutRef.current = setTimeout(() => {
