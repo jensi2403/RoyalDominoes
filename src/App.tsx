@@ -177,11 +177,8 @@ function computePixelPositions(tiles: PlacedTile[]): { px: number; py: number }[
 }
 
 function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; py: number; horiz: boolean }) {
-  let a = placed.left;
-  let b = placed.right;
-  if (placed.rotation === 180) {
-    [a, b] = [b, a];
-  }
+  const a = placed.left;
+  const b = placed.right;
 
   if (placed.isDouble) {
     const w = horiz ? TILE_SHORT : TILE_LONG;
