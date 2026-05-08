@@ -112,8 +112,13 @@ const ANCHOR_GY = Math.floor(GRID_H / 2); // 6
 const CANVAS_CX = Math.floor(CANVAS_W / 2);
 const CANVAS_CY = Math.floor(CANVAS_H / 2);
 
-function BoardPipGrid({ value }: { value: number }) {
-  const positions = PIP_POSITIONS[value] || [];
+function rotatePips90(positions: [number, number][]): [number, number][] {
+  return positions.map(([r, c]) => [c, 4 - r]) as [number, number][];
+}
+
+function BoardPipGrid({ value, rotated }: { value: number; rotated?: boolean }) {
+  let positions = PIP_POSITIONS[value] || [];
+  if (rotated) positions = rotatePips90(positions);
   return (
     <>
       {positions.map(([row, col], i) => (
@@ -174,7 +179,7 @@ function computePixelPositions(tiles: PlacedTile[]): { px: number; py: number }[
 function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; py: number; horiz: boolean }) {
   let a = placed.left;
   let b = placed.right;
-  if (placed.rotation === 90 || placed.rotation === 180) {
+  if (placed.rotation === 180) {
     [a, b] = [b, a];
   }
 
@@ -203,9 +208,9 @@ function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; 
     return (
       <div className="board-tile-abs"
         style={{ left: px, top: py + 16, width: TILE_LONG, height: TILE_SHORT, flexDirection: 'row' }}>
-        <div className="domino-half"><BoardPipGrid value={a} /></div>
+        <div className="domino-half"><BoardPipGrid value={a} rotated /></div>
         <div className="domino-divider" style={{ position: 'absolute', top: 2, bottom: 2, left: '50%', width: 1, transform: 'translateX(-50%)', background: '#b8a88a', zIndex: 2 }} />
-        <div className="domino-half"><BoardPipGrid value={b} /></div>
+        <div className="domino-half"><BoardPipGrid value={b} rotated /></div>
       </div>
     );
   } else {
