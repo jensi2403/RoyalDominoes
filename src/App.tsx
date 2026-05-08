@@ -200,19 +200,28 @@ function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; 
     );
   }
 
-  // Normal tile: 50×28, CSS rotation handles visual orientation
-  // Center the 28px short side in the 50px lane (offsetY for horiz, handled by rotation for vert)
-  const transform = placed.rotation !== 0 ? `rotate(${placed.rotation}deg)` : undefined;
-  return (
-    <div
-      className="board-tile-abs"
-      style={{ left: px, top: py + 11, transform }}
-    >
-      <div className="domino-half"><BoardPipGrid value={a} /></div>
-      <div className="domino-divider" />
-      <div className="domino-half"><BoardPipGrid value={b} /></div>
-    </div>
-  );
+  // Normal tile: 72×40, centered in the lane
+  // Horizontal: row-flex 72×40, centered vertically (+16px)
+  // Vertical:   column-flex 40×72, centered horizontally (+16px)
+  if (horiz) {
+    return (
+      <div className="board-tile-abs"
+        style={{ left: px, top: py + 16, width: TILE_LONG, height: TILE_SHORT, flexDirection: 'row' }}>
+        <div className="domino-half"><BoardPipGrid value={a} /></div>
+        <div className="domino-divider" style={{ position: 'absolute', top: 2, bottom: 2, left: '50%', width: 1, transform: 'translateX(-50%)', background: '#b8a88a', zIndex: 2 }} />
+        <div className="domino-half"><BoardPipGrid value={b} /></div>
+      </div>
+    );
+  } else {
+    return (
+      <div className="board-tile-abs"
+        style={{ left: px + 16, top: py, width: TILE_SHORT, height: TILE_LONG, flexDirection: 'column' }}>
+        <div className="domino-half"><BoardPipGrid value={a} /></div>
+        <div className="domino-divider" style={{ position: 'absolute', left: 2, right: 2, top: '50%', width: 'auto', height: 1, transform: 'translateY(-50%)', background: '#b8a88a', zIndex: 2 }} />
+        <div className="domino-half"><BoardPipGrid value={b} /></div>
+      </div>
+    );
+  }
 }
 
 function BoardChain({ board }: { board: BoardState }) {

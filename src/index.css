@@ -261,8 +261,9 @@ body {
 }
 
 .board-tile-abs .domino-half {
-  width: 50%;
-  height: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: repeat(3, 1fr);
   grid-template-columns: repeat(3, 1fr);
@@ -281,8 +282,8 @@ body {
 }
 
 .board-tile-abs .pip {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--pip-color);
 }
