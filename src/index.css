@@ -703,8 +703,6 @@ body {
 .tile-enter {
   animation: tile-place 0.25s ease-out;
 }
-
-.slide-up {
   animation: slide-up 0.3s ease-out;
 }
 

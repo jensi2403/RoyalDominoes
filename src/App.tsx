@@ -101,8 +101,16 @@ function DominoTile({
   );
 }
 
-const TILE_LONG = 50;  // long dimension (tile length along chain, or double perpendicular)
-const TILE_SHORT = 28; // short dimension (tile width, or double along chain)
+const TILE_LONG = 50;
+const TILE_SHORT = 28;
+const GRID_W = 20;
+const GRID_H = 12;
+const CANVAS_W = GRID_W * TILE_LONG;      // 1000
+const CANVAS_H = GRID_H * TILE_SHORT;     // 336
+const ANCHOR_GX = Math.floor(GRID_W / 2); // 10 — fixed grid anchor (first tile always here)
+const ANCHOR_GY = Math.floor(GRID_H / 2); // 6
+const CANVAS_CX = Math.floor(CANVAS_W / 2);
+const CANVAS_CY = Math.floor(CANVAS_H / 2);
 
 function BoardPipGrid({ value }: { value: number }) {
   const positions = PIP_POSITIONS[value] || [];
@@ -129,22 +137,37 @@ function tileIsHoriz(tiles: PlacedTile[], i: number): boolean {
   return true; // single tile defaults to horizontal
 }
 
-// Compute pixel positions by walking the chain edge-to-edge
+// Compute pixel positions anchored to the first tile (grid center) so existing
+// tiles never shift when new tiles are added to either end.
 function computePixelPositions(tiles: PlacedTile[]): { px: number; py: number }[] {
   if (tiles.length === 0) return [];
-  const result: { px: number; py: number }[] = [{ px: 0, py: 0 }];
-  for (let i = 0; i < tiles.length - 1; i++) {
-    const prev = result[i];
-    const cur = tiles[i];
-    const gdx = tiles[i + 1].x - cur.x;
-    const gdy = tiles[i + 1].y - cur.y;
-    // Step = cur tile's size in the movement direction
-    // Normal tile: LONG along chain, SHORT across; Double: SHORT along chain, LONG across
-    const step = gdx !== 0
-      ? (cur.isDouble ? TILE_SHORT : TILE_LONG)
-      : (cur.isDouble ? TILE_LONG : TILE_SHORT);
-    result.push({ px: prev.px + gdx * step, py: prev.py + gdy * step });
+
+  const result = new Array<{ px: number; py: number }>(tiles.length);
+
+  let anchorIdx = tiles.findIndex(t => t.x === ANCHOR_GX && t.y === ANCHOR_GY);
+  if (anchorIdx === -1) anchorIdx = 0;
+  result[anchorIdx] = { px: 0, py: 0 };
+
+  for (let i = anchorIdx + 1; i < tiles.length; i++) {
+    const gdx = tiles[i].x - tiles[i - 1].x;
+    const gdy = tiles[i].y - tiles[i - 1].y;
+    const horiz = gdx !== 0;
+    const step = tiles[i - 1].isDouble
+      ? (horiz ? TILE_SHORT : TILE_LONG)
+      : (horiz ? TILE_LONG : TILE_SHORT);
+    result[i] = { px: result[i - 1].px + gdx * step, py: result[i - 1].py + gdy * step };
   }
+
+  for (let i = anchorIdx - 1; i >= 0; i--) {
+    const gdx = tiles[i + 1].x - tiles[i].x;
+    const gdy = tiles[i + 1].y - tiles[i].y;
+    const horiz = gdx !== 0;
+    const step = tiles[i].isDouble
+      ? (horiz ? TILE_SHORT : TILE_LONG)
+      : (horiz ? TILE_LONG : TILE_SHORT);
+    result[i] = { px: result[i + 1].px - gdx * step, py: result[i + 1].py - gdy * step };
+  }
+
   return result;
 }
 
@@ -161,7 +184,7 @@ function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; 
     const h = horiz ? TILE_LONG : TILE_SHORT;
     return (
       <div
-        className="board-tile-abs tile-enter"
+        className="board-tile-abs"
         style={{
           left: px, top: py, width: w, height: h,
           flexDirection: horiz ? 'column' : 'row',
@@ -182,7 +205,7 @@ function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; 
   const transform = placed.rotation !== 0 ? `rotate(${placed.rotation}deg)` : undefined;
   return (
     <div
-      className="board-tile-abs tile-enter"
+      className="board-tile-abs"
       style={{ left: px, top: py + 11, transform }}
     >
       <div className="domino-half"><BoardPipGrid value={a} /></div>
@@ -194,36 +217,23 @@ function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; 
 
 function BoardChain({ board }: { board: BoardState }) {
   if (board.tiles.length === 0) {
-    return <div className="board-area"><div className="board-grid" /></div>;
+    return <div className="board-area" />;
   }
 
   const pixelPos = computePixelPositions(board.tiles);
 
-  // Compute bounding box using actual pixel positions + tile sizes
-  let minPx = Infinity, minPy = Infinity, maxPx = -Infinity, maxPy = -Infinity;
-  board.tiles.forEach((tile, i) => {
-    const { px, py } = pixelPos[i];
-    const horiz = tileIsHoriz(board.tiles, i);
-    const w = tile.isDouble ? (horiz ? TILE_SHORT : TILE_LONG) : TILE_LONG;
-    const h = tile.isDouble ? (horiz ? TILE_LONG : TILE_SHORT) : TILE_SHORT;
-    const top = tile.isDouble ? py : py + 11;
-    minPx = Math.min(minPx, px);
-    minPy = Math.min(minPy, top);
-    maxPx = Math.max(maxPx, px + w);
-    maxPy = Math.max(maxPy, top + h);
-  });
-
-  const gridW = maxPx - minPx;
-  const gridH = maxPy - minPy;
-
   return (
     <div className="board-area">
-      <div className="board-grid" style={{ width: gridW, height: gridH, position: 'relative' }}>
-        <div style={{ position: 'absolute', left: -minPx, top: -minPy }}>
-          {board.tiles.map((placed, i) => (
-            <BoardTile key={i} placed={placed} px={pixelPos[i].px} py={pixelPos[i].py} horiz={tileIsHoriz(board.tiles, i)} />
-          ))}
-        </div>
+      <div style={{ width: CANVAS_W, height: CANVAS_H, position: 'relative', flexShrink: 0 }}>
+        {board.tiles.map((placed, i) => (
+          <BoardTile
+            key={i}
+            placed={placed}
+            px={CANVAS_CX + pixelPos[i].px}
+            py={CANVAS_CY + pixelPos[i].py}
+            horiz={tileIsHoriz(board.tiles, i)}
+          />
+        ))}
       </div>
     </div>
   );
