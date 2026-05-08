@@ -513,7 +513,7 @@ export default function App() {
     const tiles = shuffle(createTileSet());
     const hands = deal(tiles);
     const starting = findStartingPlayer(hands, 1, null);
-    const isFirstPlay = prev.roundNumber === 1;
+    const isFirstPlay = true;
     const validPlays = getValidPlays(hands[0], { tiles: [], leftEnd: null, rightEnd: null, leftDir: 'left', rightDir: 'right', occupied: new Set() }, isFirstPlay);
 
     playDealSound();
@@ -577,7 +577,8 @@ export default function App() {
       if (prev.phase !== 'playing' || prev.currentPlayer !== 0) return prev;
 
       const boardEmpty = prev.board.tiles.length === 0;
-      const validPlays = getValidPlays(prev.hands[0], prev.board, boardEmpty);
+      const isFirstPlay = prev.roundNumber === 1;
+      const validPlays = getValidPlays(prev.hands[0], prev.board, isFirstPlay);
 
       const validForTile = validPlays.filter(vp =>
         (vp.tile[0] === tile[0] && vp.tile[1] === tile[1]) ||
@@ -639,7 +640,7 @@ export default function App() {
         }
 
         const nextP = nextPlayer(0) as PlayerId;
-    const isFirstPlay = true;
+        const isFirstPlay = prev.roundNumber === 1;
         const nextValidPlays = canPlay(newHands[nextP], newBoard, isFirstPlay) ? getValidPlays(newHands[nextP], newBoard, isFirstPlay) : [];
         const nextAiThinking = nextP !== 0;
 
@@ -902,8 +903,8 @@ export default function App() {
   const humanMustPass = isHumanTurn && state.validPlays.length === 0;
 
   const humanValidPlays = useMemo(() => {
-    return getValidPlays(state.hands[0], state.board, state.board.tiles.length === 0);
-  }, [state.hands[0], state.board]);
+    return getValidPlays(state.hands[0], state.board, state.roundNumber === 1);
+  }, [state.hands[0], state.board, state.roundNumber]);
 
   if (state.phase === 'setup') {
     return <SetupScreen onStart={startGame} lang={state.lang} />;
