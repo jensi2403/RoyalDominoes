@@ -58,8 +58,8 @@ body {
 
 /* --- Tile --- */
 .domino-tile {
-  width: 72px;
-  height: 138px;
+  width: 50px;
+  height: 96px;
   background: var(--tile-face);
   border-radius: 6px;
   display: flex;
@@ -98,18 +98,18 @@ body {
 
 /* Size variants */
 .domino-tile.board-tile {
-  width: 72px;
-  height: 132px;
+  width: 48px;
+  height: 92px;
 }
 
 .domino-tile.side-tile {
-  width: 72px;
-  height: 138px;
+  width: 40px;
+  height: 78px;
 }
 
 .domino-tile.side-tile.face-down {
-  width: 72px;
-  height: 138px;
+  width: 36px;
+  height: 70px;
 }
 
 
@@ -155,8 +155,8 @@ body {
 }
 
 .domino-tile .pip {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 /* --- Tile halves and pips --- */
