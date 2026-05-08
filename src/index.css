@@ -58,8 +58,8 @@ body {
 
 /* --- Tile --- */
 .domino-tile {
-  width: 50px;
-  height: 96px;
+  width: 72px;
+  height: 138px;
   background: var(--tile-face);
   border-radius: 6px;
   display: flex;
@@ -98,18 +98,18 @@ body {
 
 /* Size variants */
 .domino-tile.board-tile {
-  width: 48px;
-  height: 92px;
+  width: 72px;
+  height: 132px;
 }
 
 .domino-tile.side-tile {
-  width: 40px;
-  height: 78px;
+  width: 72px;
+  height: 138px;
 }
 
 .domino-tile.side-tile.face-down {
-  width: 36px;
-  height: 70px;
+  width: 72px;
+  height: 138px;
 }
 
 
@@ -155,8 +155,8 @@ body {
 }
 
 .domino-tile .pip {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 /* --- Tile halves and pips --- */
@@ -376,8 +376,8 @@ body {
 }
 
 .player-area.top .domino-tile.face-down {
-  width: 38px;
-  height: 20px;
+  width: 72px;
+  height: 138px;
 }
 
 .top-area {
