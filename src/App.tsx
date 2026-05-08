@@ -172,14 +172,13 @@ function computePixelPositions(tiles: PlacedTile[]): { px: number; py: number }[
 }
 
 function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; py: number; horiz: boolean }) {
-  const rot180 = placed.rotation === 180;
-  const a = rot180 ? placed.right : placed.left;
-  const b = rot180 ? placed.left : placed.right;
+  let a = placed.left;
+  let b = placed.right;
+  if (placed.rotation === 90 || placed.rotation === 180) {
+    [a, b] = [b, a];
+  }
 
   if (placed.isDouble) {
-    // Double: perpendicular to chain direction
-    // Horizontal chain → 28W × 50H (column layout)
-    // Vertical chain   → 50W × 28H (row layout)
     const w = horiz ? TILE_SHORT : TILE_LONG;
     const h = horiz ? TILE_LONG : TILE_SHORT;
     return (
@@ -200,9 +199,6 @@ function BoardTile({ placed, px, py, horiz }: { placed: PlacedTile; px: number; 
     );
   }
 
-  // Normal tile: 72×40, centered in the lane
-  // Horizontal: row-flex 72×40, centered vertically (+16px)
-  // Vertical:   column-flex 40×72, centered horizontally (+16px)
   if (horiz) {
     return (
       <div className="board-tile-abs"
